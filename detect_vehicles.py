@@ -54,8 +54,16 @@ def color_hist(img, nbins=32):    #bins_range=(0, 256)
     return hist_features
 
 
-def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None], xy_window=(64, 64), xy_overlap=(0.5, 0.5)):
+def slide_window(img):
     '''method to compute sliding windows over image for vehicle detection'''
+
+    top = np.int(img.shape[0]/2)
+    x_start_stop=[None, None]
+    y_start_stop=[top, None]
+    xy_window_min=(48,48)
+    xy_window_max=(500,500)
+    xy_overlap=(0.2, 0.2)
+    
     # If x and/or y start/stop positions not defined, set to image size
     if x_start_stop[0] == None:
         x_start_stop[0] = 0
@@ -65,33 +73,39 @@ def slide_window(img, x_start_stop=[None, None], y_start_stop=[None, None], xy_w
         y_start_stop[0] = 0
     if y_start_stop[1] == None:
         y_start_stop[1] = img.shape[0]
-    # Compute the span of the region to be searched    
-    xspan = x_start_stop[1] - x_start_stop[0]
-    yspan = y_start_stop[1] - y_start_stop[0]
-    # Compute the number of pixels per step in x/y
-    nx_pix_per_step = np.int(xy_window[0]*(1 - xy_overlap[0]))
-    ny_pix_per_step = np.int(xy_window[1]*(1 - xy_overlap[1]))
-    # Compute the number of windows in x/y
-    nx_buffer = np.int(xy_window[0]*(xy_overlap[0]))
-    ny_buffer = np.int(xy_window[1]*(xy_overlap[1]))
-    nx_windows = np.int((xspan-nx_buffer)/nx_pix_per_step) 
-    ny_windows = np.int((yspan-ny_buffer)/ny_pix_per_step) 
+        
+        
     # Initialize a list to append window positions to
     window_list = []
-    # Loop through finding x and y window positions
-    # Note: you could vectorize this step, but in practice
-    # you'll be considering windows one by one with your
-    # classifier, so looping makes sense
-    for ys in range(ny_windows):
-        for xs in range(nx_windows):
-            # Calculate window position
-            startx = xs*nx_pix_per_step + x_start_stop[0]
-            endx = startx + xy_window[0]
-            starty = ys*ny_pix_per_step + y_start_stop[0]
-            endy = starty + xy_window[1]
-            
-            # Append window position to list
-            window_list.append(((startx, starty), (endx, endy)))
+    
+    for i in range(10):
+        xy_window = (xy_window_min[0] + np.int(i*(xy_window_max[0]-xy_window_min[0])/5), xy_window_min[1] + np.int(i*(xy_window_max[1]-xy_window_min[1])/5))
+
+        # Compute the span of the region to be searched    
+        xspan = x_start_stop[1] - x_start_stop[0]
+        yspan = y_start_stop[1] - y_start_stop[0]
+        # Compute the number of pixels per step in x/y
+        nx_pix_per_step = np.int(xy_window[0]*(1 - xy_overlap[0]))
+        ny_pix_per_step = np.int(xy_window[1]*(1 - xy_overlap[1]))
+        # Compute the number of windows in x/y
+        nx_buffer = np.int(xy_window[0]*(xy_overlap[0]))
+        ny_buffer = np.int(xy_window[1]*(xy_overlap[1]))
+        nx_windows = np.int((xspan-nx_buffer)/nx_pix_per_step) 
+        ny_windows = np.int((yspan-ny_buffer)/ny_pix_per_step) 
+        # Loop through finding x and y window positions
+        # Note: you could vectorize this step, but in practice
+        # you'll be considering windows one by one with your
+        # classifier, so looping makes sense
+        for ys in range(ny_windows):
+            for xs in range(nx_windows):
+                # Calculate window position
+                startx = xs*nx_pix_per_step + x_start_stop[0]
+                endx = startx + xy_window[0]
+                starty = ys*ny_pix_per_step + y_start_stop[0]
+                endy = starty + xy_window[1]
+                
+                # Append window position to list
+                window_list.append(((startx, starty), (endx, endy)))
     # Return the list of windows
     return window_list
 
@@ -155,9 +169,28 @@ def extract_features(file_names, color_space='RGB', spatial_size=(32, 32),
                         pix_per_cell=8, cell_per_block=2, hog_channel=0,
                         spatial_feat=True, hist_feat=True, hog_feat=True):
     '''extract features from list of image names'''
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        return p.map(single_image_features_tupled, [(cv2.imread(file_name), color_space, spatial_size, hist_bins, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for file_name in file_names])
+    global multip
+    return multip.map(single_image_features_tupled, [(cv2.imread(file_name), color_space, spatial_size, hist_bins, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for file_name in file_names])
 
+def search_windows_with_args(args):
+    img, window, clf, scaler, color_space, spatial_size, hist_bins, hist_range, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat = args
+
+    #3) Extract the test window from original image
+    test_img = cv2.resize(img[window[0][1]:window[1][1], window[0][0]:window[1][0]], (64, 64))      
+    #4) Extract features for that window using single_img_features()
+    features = single_img_features(test_img, color_space=color_space, 
+                        spatial_size=spatial_size, hist_bins=hist_bins, 
+                        orient=orient, pix_per_cell=pix_per_cell, 
+                        cell_per_block=cell_per_block, 
+                        hog_channel=hog_channel, spatial_feat=spatial_feat, 
+                        hist_feat=hist_feat, hog_feat=hog_feat)
+    #5) Scale extracted features to be fed to classifier
+    test_features = scaler.transform(np.array(features).reshape(1, -1))
+    #6) Predict using your classifier
+    prediction = clf.predict(test_features)
+    #7) If positive (prediction == 1) then save the window
+    return window if prediction == 1 else None
+        
 def search_windows(img, windows, clf, scaler, color_space='RGB', 
                     spatial_size=(32, 32), hist_bins=32, 
                     hist_range=(0, 256), orient=9, 
@@ -165,29 +198,14 @@ def search_windows(img, windows, clf, scaler, color_space='RGB',
                     hog_channel=0, spatial_feat=True, 
                     hist_feat=True, hog_feat=True):
     '''method to find vehicles within precomputed search windows in an image'''
+    global multip
 
     #1) Create an empty list to receive positive detection windows
-    on_windows = []
+    on_windows = multip.map(search_windows_with_args, [(img, window, clf, scaler, color_space, spatial_size, hist_bins, hist_range, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for window in windows])
     #2) Iterate over all windows in the list
-    for window in windows:
-        #3) Extract the test window from original image
-        test_img = cv2.resize(img[window[0][1]:window[1][1], window[0][0]:window[1][0]], (64, 64))      
-        #4) Extract features for that window using single_img_features()
-        features = single_img_features(test_img, color_space=color_space, 
-                            spatial_size=spatial_size, hist_bins=hist_bins, 
-                            orient=orient, pix_per_cell=pix_per_cell, 
-                            cell_per_block=cell_per_block, 
-                            hog_channel=hog_channel, spatial_feat=spatial_feat, 
-                            hist_feat=hist_feat, hog_feat=hog_feat)
-        #5) Scale extracted features to be fed to classifier
-        test_features = scaler.transform(np.array(features).reshape(1, -1))
-        #6) Predict using your classifier
-        prediction = clf.predict(test_features)
-        #7) If positive (prediction == 1) then save the window
-        if prediction == 1:
-            on_windows.append(window)
+
     #8) Return windows for positive detections
-    return on_windows
+    return list(filter(None, on_windows))
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     '''method to draw bounding boxes on image'''
@@ -274,13 +292,8 @@ def process_image(image):
     """completely process a single BGR image"""
     global classifier
     global X_scaler
-    
-    top = np.int(image.shape[0]/2)
 
-    y_start_stop = [top, None] # Min and max in y to search in slide_window()
-
-    windows = slide_window(image, x_start_stop=[None, None], y_start_stop=y_start_stop, 
-                    xy_window=(192, 192), xy_overlap=(0.2, 0.2))
+    windows = slide_window(image)
 
     hot_windows = search_windows(image, windows, classifier, X_scaler, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
@@ -298,24 +311,30 @@ def process_image(image):
 
     return final
 
-print("Training vehicle classifier...")
 
-train_vehicle_classifier()
+with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+    global multip
+    multip = p
 
-# ENTRY POINT
+    print("Training vehicle classifier...")
+    
+    train_vehicle_classifier()
+    
+    # ENTRY POINT
+    
+    # run image processing on test images
 
-# run image processing on test images
-for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
-    print("Processing %s..." % test_image)
-    reset_measurements()
-    cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), cv2.cvtColor(
-        process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR)), cv2.COLOR_BGR2RGB))
-
-# run image processing on test videos
-for file_name in glob.glob("*.mp4"):
-    if "_processed" in file_name:
-        continue
-    print("Processing %s..." % file_name)
-    reset_measurements()
-    VideoFileClip(file_name).fl_image(process_image).write_videofile(
-        os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+    for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
+        print("Processing %s..." % test_image)
+        reset_measurements()
+        cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), cv2.cvtColor(
+            process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR)), cv2.COLOR_BGR2RGB))
+    
+    # run image processing on test videos
+    for file_name in glob.glob("*.mp4"):
+        if "_processed" in file_name:
+            continue
+        print("Processing %s..." % file_name)
+        reset_measurements()
+        VideoFileClip(file_name).fl_image(process_image).write_videofile(
+            os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
