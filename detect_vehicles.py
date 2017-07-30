@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 from moviepy.editor import VideoFileClip
 import matplotlib.pyplot as plt
+from scipy.ndimage.measurements import label
 from skimage.feature import hog
 from sklearn.cross_validation import train_test_split
 from sklearn.svm import LinearSVC
@@ -219,6 +220,39 @@ def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     # Return the image copy with boxes drawn
     return imcopy
 
+def add_heat(heatmap, bbox_list):
+    # Iterate through list of bboxes
+    for box in bbox_list:
+        # Add += 1 for all pixels inside each bbox
+        # Assuming each "box" takes the form ((x1, y1), (x2, y2))
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+
+    # Return updated heatmap
+    return heatmap# Iterate through list of bboxes
+    
+def apply_threshold(heatmap, threshold):
+    # Zero out pixels below the threshold
+    heatmap[heatmap <= threshold] = 0
+    # Return thresholded map
+    return heatmap
+
+def draw_labeled_bboxes(img, labels):
+    # Make a copy of the image
+    imcopy = np.copy(img)
+    # Iterate through all detected cars
+    for car_number in range(1, labels[1]+1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        # Draw the box on the image
+        cv2.rectangle(imcopy, bbox[0], bbox[1], (0,255,0), 6)
+    # Return the image
+    return imcopy
+
 ### TODO: Tweak these parameters and see how the results change.
 color_space = 'HLS' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 orient = 9  # HOG orientations
@@ -295,14 +329,40 @@ def process_image(image):
 
     windows = slide_window(image)
 
-    hot_windows = search_windows(image, windows, classifier, X_scaler, color_space=color_space, 
+    flagged_windows = search_windows(image, windows, classifier, X_scaler, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
                             hog_channel=hog_channel, spatial_feat=spatial_feat, 
-                            hist_feat=hist_feat, hog_feat=hog_feat)                       
+                            hist_feat=hist_feat, hog_feat=hog_feat) 
+                      
+    image_with_flagged_windows = draw_boxes(image, flagged_windows, color=(0, 0, 255), thick=6)
     
-    final = draw_boxes(image, hot_windows, color=(0, 0, 255), thick=6)
+    if debug_image == True:
+        plt.figure(figsize=(20, 10))
+        plt.imshow(image_with_flagged_windows)
+        plt.show()
+    
+    heat = np.zeros_like(image[:,:,0]).astype(np.float)    
+    
+    # Add heat to each box in box list
+    heat = add_heat(heat, flagged_windows)
+        
+    # Apply threshold to help remove false positives
+    heat = apply_threshold(heat,1)
+    
+    # Visualize the heatmap when displaying    
+    heatmap = np.clip(heat, 0, 255)
+    
+    if debug_image == True:
+        plt.figure(figsize=(20, 10))
+        plt.imshow(heatmap, cmap='hot')
+        plt.show()
+    
+    # Find final boxes from heatmap using label function
+    labels = label(heatmap)
+
+    final = draw_labeled_bboxes(image, labels)
 
     if debug_image == True:
         plt.figure(figsize=(20, 10))
