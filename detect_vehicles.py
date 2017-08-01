@@ -2,6 +2,7 @@
 
 from collections import deque
 import glob
+import itertools
 import multiprocessing
 import os
 import pickle
@@ -63,15 +64,15 @@ def color_hist(img, nbins=32):    #bins_range=(0, 256)
     return hist_features
 
 
-def slide_window(img):
+def slide_window_1(img):
     '''method to compute sliding windows over image for vehicle detection'''
 
     top = np.int(img.shape[0]/2)
     x_start_stop=[None, None]
     y_start_stop=[top, None]
-    xy_window_min=(48,48)
-    xy_window_max=(500,500)
-    xy_overlap=(0.5, 0.5)
+    xy_window_min=(50,50)
+    xy_window_max=(250,250)
+    xy_overlap=(0.75, 0.75)
     
     # If x and/or y start/stop positions not defined, set to image size
     if x_start_stop[0] == None:
@@ -87,7 +88,7 @@ def slide_window(img):
     # Initialize a list to append window positions to
     window_list_all = []
     
-    for i in range(10):
+    for i in range(5):
         window_list = []
         xy_window = (xy_window_min[0] + np.int(i*(xy_window_max[0]-xy_window_min[0])/5), xy_window_min[1] + np.int(i*(xy_window_max[1]-xy_window_min[1])/5))
 
@@ -102,6 +103,68 @@ def slide_window(img):
         ny_buffer = np.int(xy_window[1]*(xy_overlap[1]))
         nx_windows = np.int((xspan-nx_buffer)/nx_pix_per_step) 
         ny_windows = np.int((yspan-ny_buffer)/ny_pix_per_step) 
+        # Loop through finding x and y window positions
+        # Note: you could vectorize this step, but in practice
+        # you'll be considering windows one by one with your
+        # classifier, so looping makes sense
+        for ys in range(ny_windows):
+            for xs in range(nx_windows):
+                # Calculate window position
+                startx = xs*nx_pix_per_step + x_start_stop[0]
+                endx = startx + xy_window[0]
+                starty = ys*ny_pix_per_step + y_start_stop[0]
+                endy = starty + xy_window[1]
+                
+                # Append window position to list
+                window_list.append(((startx, starty), (endx, endy)))
+        
+        if debug_image == True:
+            plt.imshow(draw_boxes(img, window_list))
+            plt.show()
+            
+        window_list_all.extend(window_list)
+    # Return the list of windows
+    return window_list_all
+
+def slide_window_2(img):
+    '''method to compute sliding windows over image for vehicle detection'''
+
+    top = 400
+    x_start_stop=[None, None]
+    y_start_stop=[top, None]
+    xy_window_min=(50,50)
+    xy_window_max=(250,250)
+    xy_overlap=(0.75, 0.75)
+    
+    # If x and/or y start/stop positions not defined, set to image size
+    if x_start_stop[0] == None:
+        x_start_stop[0] = 0
+    if x_start_stop[1] == None:
+        x_start_stop[1] = img.shape[1]
+    if y_start_stop[0] == None:
+        y_start_stop[0] = 0
+    if y_start_stop[1] == None:
+        y_start_stop[1] = img.shape[0]
+        
+        
+    # Initialize a list to append window positions to
+    window_list_all = []
+    
+    for i in range(5):
+        window_list = []
+        xy_window = (xy_window_min[0] + np.int(i*(xy_window_max[0]-xy_window_min[0])/5), xy_window_min[1] + np.int(i*(xy_window_max[1]-xy_window_min[1])/5))
+
+        # Compute the span of the region to be searched    
+        xspan = x_start_stop[1] - x_start_stop[0]
+        yspan = y_start_stop[1] - y_start_stop[0]
+        # Compute the number of pixels per step in x/y
+        nx_pix_per_step = np.int(xy_window[0]*(1 - xy_overlap[0]))
+        ny_pix_per_step = np.int(xy_window[1]*(1 - xy_overlap[1]))
+        # Compute the number of windows in x/y
+        nx_buffer = np.int(xy_window[0]*(xy_overlap[0]))
+        ny_buffer = np.int(xy_window[1]*(xy_overlap[1]))
+        nx_windows = np.int((xspan-nx_buffer)/nx_pix_per_step) 
+        ny_windows = 3 
         # Loop through finding x and y window positions
         # Note: you could vectorize this step, but in practice
         # you'll be considering windows one by one with your
@@ -272,9 +335,9 @@ def add_heat(heatmap, bbox_list):
     
 def apply_threshold(heatmap, threshold):
     # Zero out pixels below the threshold
-    heatmap[heatmap <= threshold] = 0
+    #heatmap[heatmap <= threshold] = 0
     # Return thresholded map
-    return heatmap
+    return np.maximum(heatmap-threshold,0)
 
 def draw_labeled_bboxes(img, labels):
     # Make a copy of the image
@@ -294,18 +357,18 @@ def draw_labeled_bboxes(img, labels):
     return imcopy
 
 ### TODO: Tweak these parameters and see how the results change.
-color_space = 'HLS' # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+color_space_options = ['LUV'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 orient = 9  # HOG orientations
-pix_per_cell = 8 # HOG pixels per cell
-cell_per_block = 3 # HOG cells per block
-hog_channel = 2 # Can be 0, 1, 2, or "ALL"
+pix_per_cell_options = [16] # HOG pixels per cell
+cell_per_block = 2 # HOG cells per block
+hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
 spatial_size = (16, 16) # Spatial binning dimensions
-hist_bins = 16    # Number of histogram bins
-spatial_feat = True # Spatial features on or off
-hist_feat = True # Histogram features on or off
+hist_bins = 32    # Number of histogram bins
+spatial_feat = False # Spatial features on or off
+hist_feat = False # Histogram features on or off
 hog_feat = True # HOG features on or off
 
-def train_vehicle_classifier():
+def train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat):
     '''train a classifier to identify vehicles in a single image'''
     global classifier
     global X_scaler
@@ -375,35 +438,41 @@ def train_vehicle_classifier():
               "rf__min_samples_split": sp_randint(2, 15),
               "rf__min_samples_leaf": sp_randint(1, 15)}    
     
-    classifier = VotingClassifier(estimators=[('svc', LinearSVC()), ('rf', RandomForestClassifier())], voting='hard')
+    #classifier = VotingClassifier(estimators=[('svc', LinearSVC()), ('rf', RandomForestClassifier())], voting='hard')
     
-    classifier = RandomizedSearchCV(classifier, param_distributions=params, n_iter = 20, n_jobs = multiprocessing.cpu_count(), cv = 3, verbose = 1)
-    
+    #classifier = RandomizedSearchCV(classifier, param_distributions=params, n_iter = 20, n_jobs = multiprocessing.cpu_count(), cv = 3, verbose = 1)
+    classifier = LinearSVC()
     
     # Check the training time for the SVC
     t=time.time()
     classifier.fit(X_train, y_train)
     t2 = time.time()
-    print("best estimator score: %s with %s (%s)" % (classifier.best_score_, classifier.best_estimator_, classifier.best_params_))
+    #print("best estimator score: %s with %s (%s)" % (classifier.best_score_, classifier.best_estimator_, classifier.best_params_))
     print(round(t2-t, 2), 'Seconds to train classifier...')
     # Check the score of the SVC
     print('Test Accuracy of classifier = ', round(classifier.score(X_test, y_test), 4))
     # Check the prediction time for a single sample
     t=time.time()
     
-    with open('best_classifier', 'wb') as f:
+    with open(identifier + '_best_classifier', 'wb') as f:
         pickle.dump(classifier, f)
 
 def reset_measurements():
     """reset vehicle state between videos / still images"""
+    global heat
+    try:
+        del heat
+    except:
+        pass
 
 
-def process_image(image):
+def process_image(image, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold):
     """completely process a single BGR image"""
     global classifier
     global X_scaler
+    global heat
 
-    windows = slide_window(image)
+    windows = slide_window_2(image)
 
     flagged_windows = search_windows(image, windows, classifier, X_scaler, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
@@ -419,13 +488,17 @@ def process_image(image):
         plt.imshow(image_with_flagged_windows)
         plt.show()
     
-    heat = np.zeros_like(image[:,:,0]).astype(np.float)    
-    
+    try:
+        heat
+    except:
+        print("resetting heatmap")
+        heat = np.zeros_like(image[:,:,0]).astype(np.float)
+
     # Add heat to each box in box list
     heat = add_heat(heat, flagged_windows)
         
     # Apply threshold to help remove false positives
-    heat = apply_threshold(heat,1)
+    heat = apply_threshold(heat, heat_threshold)
     
     # Visualize the heatmap when displaying    
     heatmap = np.clip(heat, 0, 255)
@@ -438,7 +511,7 @@ def process_image(image):
     # Find final boxes from heatmap using label function
     labels = label(heatmap)
 
-    final = draw_labeled_bboxes(image_with_flagged_windows, labels)
+    final = draw_labeled_bboxes(image, labels)
 
     if debug_image == True:
         plt.figure(figsize=(20, 10))
@@ -447,141 +520,57 @@ def process_image(image):
 
     return final
 
-#===============================================================================
-# 
-# def make_noncar_boxes(img, patches, y_min = 583, y_max = 980, n_per_img = 6, mean_size = 96):
-#     '''
-#     Creates n_per_image random box coordinates per image, that don't contain a car 
-#     (or more precisely, do not intersect with areas marked as containing a car).
-#     '''
-#     boxes = []
-# 
-#     # Make a blank image
-#     canvas = np.zeros_like(img[:, :, 0])
-#     car_boxes = patches.loc[:, 'xmin':'ymax']
-#     img_copy = np.copy(img)
-#     
-#     # Make a map of the bounding boxes
-#     for row in car_boxes.itertuples():
-#         xmin = min(row[1], row[2])
-#         xmax = max(row[1], row[2])
-#         ymin = min(row[3], row[4])
-#         ymax = max(row[3], row[4])
-#         # Vertices
-#         v0 = np.array([xmin, ymin])
-#         v1 = np.array([xmax, ymin])
-#         v2 = np.array([xmax, ymax])
-#         v3 = np.array([xmin, ymax])
-#         # Draw box on canvas
-#         cv2.fillConvexPoly(canvas, np.array([v0, v1, v2, v3]), (255.))
-#         tried, retained = 0, 0
-# 
-#         while len(boxes) < n_per_img:  # Try new random boxes until we have as many as specified
-#             tried += 1
-#             # Randomly build boxes
-#             # Top left corner:
-#             x0, y0 = np.random.randint(0, 1760), np.random.randint(y_min, y_max)
-#             # Bottom right corner (size is taken from a truncated normal distribution)
-#             lower, upper = 32, 160
-#             sigma = mean_size / 3
-#             box_size = int(stats.truncnorm((lower - mean_size) / sigma, 
-#                 (upper - mean_size) / sigma, loc = mean_size, 
-#                 scale = sigma).rvs())
-#             x1, y1 = x0 + box_size, y0 + box_size
-# 
-#             # Extract this patch of the canvas
-#             box_array = canvas[y0:y1, x0:x1]
-# 
-#             # Make sure this box doesn't intersect with car boxes already present on the canvas:
-#             if (box_array == 0.).all() and (x1 <= 1920) and (y1 <= y_max):
-#                 # In that case append to list
-#                 boxes.append(((x0, y0), (x1, y1)))
-#                 retained += 1
-# 
-#     return boxes  # Return list of non-car boxes for this image
-# 
-# def extract_patches(dataframe, min_x, n_lines = None, size = (64, 64)):
-#     '''
-#     Uses the CSV file provided with the Udacity data to extract picture patches of cars and resize
-#     them to the specified size.
-#     The dataframe passed as argument contains box coordinates, frame filenames and labels from
-#     the images in the dataset.
-#     '''
-# 
-#     car_imgs = []
-#     noncar_imgs = []
-# 
-#     # Filter out all non-car patches
-#     cars_only = dataframe.loc[dataframe['Label'] == 'Car', 
-#         ['xmin', 'xmax', 'ymin', 'ymax', 'Frame']]  
-#     # Warning: These column names are wrong! We need to swap two:
-#     cars_only[['xmax', 'ymin']] = cars_only[['ymin', 'xmax']]
-# 
-#     # Sort the dataframe by 'Frame'
-#     cars_only.sort_values('Frame', inplace = True)
-# 
-#     if n_lines:
-#         cars_only = cars_only.iloc[:n_lines, :]
-# 
-#     for filename in cars_only['Frame'].unique():
-#         img_patches = cars_only[cars_only['Frame'] == filename]
-#         img = plt.imread("object-detection-crowdai/" + filename)
-#         print("Processing file:", filename)
-#         count = 0
-#         for row in img_patches.itertuples():
-#             # Warning: the column names are all scambled up in the CSV file
-#             xmin = min(row[1], row[2])
-#             xmax = max(row[1], row[2])
-#             ymin = min(row[3], row[4])
-#             ymax = max(row[3], row[4])
-# 
-#             if (xmin < xmax) and (ymin < ymax) and (xmin >= min_x):
-#                 car_img_out = cv2.resize(img[ymin:ymax, xmin:xmax], size)
-#                 car_imgs.append(car_img_out)
-#                 plt.imshow(car_img_out)
-#                 plt.show()
-#                 count += 1
-# 
-#         if count != 0:
-#             # Make a list of random non-car boxes
-#             noncar_boxes = make_noncar_boxes(img, img_patches, y_min = 450, n_per_img = count)
-#             # Extract these image patches and append them to noncar_imgs
-#             for box in noncar_boxes:
-#                 
-#                 x0, y0 = box[0][0], box[0][1]
-#                 x1, y1 = box[1][0], box[1][1]
-#                 noncar_img_out = img[y0:y1, x0:x1]
-#                 
-#                 noncar_imgs.append(cv2.resize(noncar_img_out, (64, 64)))
-# 
-#     return car_imgs, noncar_imgs
-#===============================================================================
+#classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options)
+classifier_arg_groups = [('LUV',10),('LUV',12),('LUV',14)]
 
-with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-    global multip
-    multip = p
-
-    print("Training vehicle classifier...")
-    
-    train_vehicle_classifier()
-    
-    # ENTRY POINT
-    
-    # run image processing on test images
-
-    for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
-        print("Processing %s..." % test_image)
-        reset_measurements()
-        cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), cv2.cvtColor(
-            process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR)), cv2.COLOR_BGR2RGB))
-    
-    # run image processing on test videos
-    #===========================================================================
-    # for file_name in glob.glob("*.mp4"):
-    #     if "_processed" in file_name:
-    #         continue
-    #     print("Processing %s..." % file_name)
-    #     reset_measurements()
-    #     VideoFileClip(file_name).fl_image(process_image).write_videofile(
-    #         os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
-    #===========================================================================
+for classifier_args in classifier_arg_groups:
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+        global multip
+        try:
+            del multip
+        except:
+            pass
+        global classifier
+        global X_scaler
+        try:
+            del classifier
+        except:
+            pass
+        try:
+            del X_scaler
+        except:
+            pass
+        multip = p
+        
+        color_space, pix_per_cell = classifier_args
+        identifier = ",".join(map(str,classifier_args))
+        
+        if (spatial_feat or hist_feat or hog_feat) is False:
+            continue
+        #if (os.path.isfile(os.path.join('output_images', identifier + "_test1.jpg")) == True):
+        #    continue
+        
+        print("Training vehicle classifier %s..." % identifier)
+        
+        
+        train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat)
+        
+        # ENTRY POINT
+        
+        # run image processing on test images
+        heat_threshold_opts = {10:2,12:1,14:3}
+        heat_threshold = heat_threshold_opts.get(pix_per_cell)
+        for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
+            print("Processing %s..." % test_image)
+            reset_measurements()
+            cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_" + os.path.basename(test_image)), cv2.cvtColor(
+                process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
+        
+        #run image processing on test videos
+        for file_name in glob.glob("project_video.mp4"):
+            if "_processed" in file_name:
+                continue
+            print("Processing %s..." % file_name)
+            reset_measurements()
+            VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
+                identifier + "," + str(heat_threshold) + ",slide2_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
