@@ -357,9 +357,9 @@ def draw_labeled_bboxes(img, labels):
     return imcopy
 
 ### TODO: Tweak these parameters and see how the results change.
-color_space_options = ['LUV'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+color_space_options = ['HLS','YUV','LUV','YCrCb'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
 orient = 9  # HOG orientations
-pix_per_cell_options = [16] # HOG pixels per cell
+pix_per_cell_options = [8,10,12,14,16] # HOG pixels per cell
 cell_per_block = 2 # HOG cells per block
 hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
 spatial_size = (16, 16) # Spatial binning dimensions
@@ -521,7 +521,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_feat, hist
     return final
 
 #classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options)
-classifier_arg_groups = [('LUV',10),('LUV',12),('LUV',14)]
+classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),('YCrCb', 16, 1),('YCrCb', 16, 2),('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
 
 for classifier_args in classifier_arg_groups:
     with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
@@ -542,7 +542,7 @@ for classifier_args in classifier_arg_groups:
             pass
         multip = p
         
-        color_space, pix_per_cell = classifier_args
+        color_space, pix_per_cell, heat_threshold = classifier_args
         identifier = ",".join(map(str,classifier_args))
         
         if (spatial_feat or hist_feat or hog_feat) is False:
@@ -558,13 +558,14 @@ for classifier_args in classifier_arg_groups:
         # ENTRY POINT
         
         # run image processing on test images
-        heat_threshold_opts = {10:2,12:1,14:3}
-        heat_threshold = heat_threshold_opts.get(pix_per_cell)
-        for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
-            print("Processing %s..." % test_image)
-            reset_measurements()
-            cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_" + os.path.basename(test_image)), cv2.cvtColor(
-                process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
+        #heat_threshold_opts = {10:2,12:1,14:3}
+        #heat_threshold = heat_threshold_opts.get(pix_per_cell)
+        #for heat_threshold in [1,2,3,4,5,6,8,10]:
+        #for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
+        #    print("Processing %s..." % test_image)
+        #    reset_measurements()
+        #    cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_" + os.path.basename(test_image)), cv2.cvtColor(
+        #        process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
         
         #run image processing on test videos
         for file_name in glob.glob("project_video.mp4"):
