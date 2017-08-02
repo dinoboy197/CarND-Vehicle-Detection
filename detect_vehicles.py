@@ -325,7 +325,7 @@ def find_cars(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=
     nblocks_per_window = (window // pix_per_cell) - cell_per_block + 1
     cells_per_step = 2  # Instead of overlap, define how many cells to step
     nxsteps = (nxblocks - nblocks_per_window) // cells_per_step
-    nysteps = 3
+    nysteps = (nyblocks - nblocks_per_window) // cells_per_step
     
     # Compute individual channel HOG features for the entire image
     hog1 = get_hog_features(ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
@@ -581,7 +581,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
                             hog_channel=hog_channel, spatial_feat=spatial_feat, 
-                            hist_feat=hist_feat, hog_feat=hog_feat), [1.0,1.5,2.0,2.5])
+                            hist_feat=hist_feat, hog_feat=hog_feat), [1.0])
     flagged_windows = []
     for x in flagged_windows_all:
         flagged_windows.extend(x)
@@ -629,19 +629,18 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
 def run():
     
     ### TODO: Tweak these parameters and see how the results change.
-    color_space_options = ['HLS','YUV','LUV','YCrCb'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    color_space_options = ['YCrCb','LUV','HLS','YUV'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
     orient = 9  # HOG orientations
     pix_per_cell_options = [8,10,12,14,16] # HOG pixels per cell
     cell_per_block = 2 # HOG cells per block
     hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
     spatial_size = (32, 32) # Spatial binning dimensions
     hist_bins = 32    # Number of histogram bins
-    spatial_feat = True # Spatial features on or off
-    hist_feat = True # Histogram features on or off
+    spatial_feat = False # Spatial features on or off
+    hist_feat = False # Histogram features on or off
     hog_feat = True # HOG features on or off
-    heat_thresholds = [1,3,5]
 
-    classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options, heat_thresholds)
+    classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options)
     #classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),('YCrCb', 16, 1),('YCrCb', 16, 2),('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
 
     #classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),]
@@ -667,7 +666,7 @@ def run():
             
             
             
-            color_space, pix_per_cell, heat_threshold = classifier_args
+            color_space, pix_per_cell = classifier_args
             identifier = ",".join(map(str,classifier_args))
             
             if (spatial_feat or hist_feat or hog_feat) is False:
@@ -685,7 +684,7 @@ def run():
             # run image processing on test images
             #heat_threshold_opts = {10:2,12:1,14:3}
             #heat_threshold = heat_threshold_opts.get(pix_per_cell)
-            #for heat_threshold in [1,2,3,4,5,6,8,10]:
+            for heat_threshold in [2,3,4,5]:
             #for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
             #    print("Processing %s..." % test_image)
             #    reset_measurements()
@@ -693,12 +692,12 @@ def run():
             #        process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
             
             #run image processing on test videos
-            for file_name in glob.glob("test_video.mp4"):
-                if "_processed" in file_name:
-                    continue
-                print("Processing %s..." % file_name)
-                reset_measurements()
-                VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
-                    identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+                for file_name in glob.glob("project_video.mp4"):
+                    if "_processed" in file_name:
+                        continue
+                    print("Processing %s..." % file_name)
+                    reset_measurements()
+                    VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
+                        identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
 
 run()
