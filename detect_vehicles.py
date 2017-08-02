@@ -596,7 +596,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
     # Add heat to each box in box list
     heat = add_heat(heat, flagged_windows)
     
-    if len(last_heat_measurements) >= 5:
+    if len(last_heat_measurements) >= 3:
         last_heat_measurements.popleft()
     
     last_heat_measurements.append(heat)
@@ -630,9 +630,9 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
 def run():
     
     ### TODO: Tweak these parameters and see how the results change.
-    color_space_options = ['YCrCb','LUV','HLS','YUV'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    color_space_options = ['YCrCb'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
     orient = 9  # HOG orientations
-    pix_per_cell_options = [8,10,12,14,16] # HOG pixels per cell
+    pix_per_cell_options = [8] # HOG pixels per cell
     cell_per_block = 2 # HOG cells per block
     hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
     spatial_size = (32, 32) # Spatial binning dimensions
@@ -685,7 +685,7 @@ def run():
             # run image processing on test images
             #heat_threshold_opts = {10:2,12:1,14:3}
             #heat_threshold = heat_threshold_opts.get(pix_per_cell)
-            for heat_threshold in [7,8,9,10,11]:
+            for heat_threshold in [8]:
             #for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
             #    print("Processing %s..." % test_image)
             #    reset_measurements()
@@ -698,7 +698,8 @@ def run():
                         continue
                     print("Processing %s..." % file_name)
                     reset_measurements()
+                    #.cutout(44,51).cutout(30,38).cutout(21,28).cutout(4,14)
                     VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
-                        identifier + "," + str(heat_threshold) + ",slide2_fast_car_queue_heat_smoothing_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+                        identifier + "," + str(heat_threshold) + ",slide2_fast_car_queue_heat_smoothing_3_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
 
 run()
