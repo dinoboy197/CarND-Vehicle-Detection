@@ -240,7 +240,7 @@ def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
     return np.concatenate(img_features)
 
 def find_cars_inner(args):
-    xb, yb, cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window, scale, ystart = args
+    xb, yb, cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window, scale, ystart, pix_per_cell, X_scaler, classifier, hog_channel, spatial_feat, spatial_size, hist_feat, hist_bins = args
     ypos = yb*cells_per_step
     xpos = xb*cells_per_step
     # Extract HOG for this patch
@@ -286,6 +286,8 @@ def find_cars_inner(args):
 def find_cars(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=(32, 32), hist_bins=32, orient=9, pix_per_cell=8,
               cell_per_block=2, hog_channel=0, spatial_feat=True, hist_feat=True, hog_feat=True):
 
+    global multip
+    
     ystart = 400
     ystop = 656
 
@@ -334,7 +336,7 @@ def find_cars(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=
     matched_windows = []
 
     iter = itertools.product(range(nxsteps), range(nysteps))
-    results = list(map(find_cars_inner, [(x[0], x[1], cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window, scale, ystart) for x in iter]))
+    results = list(multip.map(find_cars_inner, [(x[0], x[1], cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window, scale, ystart, pix_per_cell, X_scaler, classifier, hog_channel, spatial_feat, spatial_size, hist_feat, hist_bins) for x in iter]))
     all_windows = list(map(lambda x: x[0], results))
     matched_windows = list(filter(lambda x: x != None, map(lambda x: x[0] if x[1] == True else None, results)))
     
@@ -461,19 +463,8 @@ def draw_labeled_bboxes(img, labels):
     # Return the image
     return imcopy
 
-### TODO: Tweak these parameters and see how the results change.
-color_space_options = ['HLS','YUV','LUV','YCrCb'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
-orient = 9  # HOG orientations
-pix_per_cell_options = [8,10,12,14,16] # HOG pixels per cell
-cell_per_block = 2 # HOG cells per block
-hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
-spatial_size = (16, 16) # Spatial binning dimensions
-hist_bins = 32    # Number of histogram bins
-spatial_feat = True # Spatial features on or off
-hist_feat = False # Histogram features on or off
-hog_feat = True # HOG features on or off
 
-def train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat):
+def train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat):
     '''train a classifier to identify vehicles in a single image'''
     global classifier
     global X_scaler
@@ -482,13 +473,13 @@ def train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, sp
     cars = glob.glob('vehicles/KITTI_extracted/*.png')
     notcars = glob.glob('non-vehicles/Extras/*.png')
     
-    car_features = extract_features(cars[:100], color_space=color_space, 
+    car_features = extract_features(cars, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
                             hog_channel=hog_channel, spatial_feat=spatial_feat, 
                             hist_feat=hist_feat, hog_feat=hog_feat)
-    notcar_features = extract_features(notcars[:100], color_space=color_space, 
+    notcar_features = extract_features(notcars, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
@@ -571,7 +562,7 @@ def reset_measurements():
         pass
 
 
-def process_image(image, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold):
+def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold):
     """completely process a single BGR image"""
     global classifier
     global X_scaler
@@ -585,7 +576,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_feat, hist
     #                        cell_per_block=cell_per_block, 
     #                        hog_channel=hog_channel, spatial_feat=spatial_feat, 
     #                        hist_feat=hist_feat, hog_feat=hog_feat) 
-    flagged_windows = find_cars(image, 1.0, classifier, X_scaler, color_space=color_space, 
+    flagged_windows = find_cars(image, 2.0, classifier, X_scaler, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
@@ -631,59 +622,79 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_feat, hist
 
     return final
 
-#classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options)
-#classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),('YCrCb', 16, 1),('YCrCb', 16, 2),('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
-classifier_arg_groups = [('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
 
-for classifier_args in classifier_arg_groups:
-    with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
-        global multip
-        try:
-            del multip
-        except:
-            pass
-        global classifier
-        global X_scaler
-        try:
-            del classifier
-        except:
-            pass
-        try:
-            del X_scaler
-        except:
-            pass
-        multip = p
-        
-        color_space, pix_per_cell, heat_threshold = classifier_args
-        identifier = ",".join(map(str,classifier_args))
-        
-        if (spatial_feat or hist_feat or hog_feat) is False:
-            continue
-        #if (os.path.isfile(os.path.join('output_images', identifier + "_test1.jpg")) == True):
-        #    continue
-        
-        print("Training vehicle classifier %s..." % identifier)
-        
-        
-        train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat)
-        
-        # ENTRY POINT
-        
-        # run image processing on test images
-        #heat_threshold_opts = {10:2,12:1,14:3}
-        #heat_threshold = heat_threshold_opts.get(pix_per_cell)
-        #for heat_threshold in [1,2,3,4,5,6,8,10]:
-        for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
-            print("Processing %s..." % test_image)
-            reset_measurements()
-            cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_" + os.path.basename(test_image)), cv2.cvtColor(
-                process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
-        
-        #run image processing on test videos
-        for file_name in glob.glob("test_video.mp4"):
-            if "_processed" in file_name:
+def run():
+    
+    ### TODO: Tweak these parameters and see how the results change.
+    color_space_options = ['HLS','YUV','LUV','YCrCb'] # Can be RGB, HSV, LUV, HLS, YUV, YCrCb
+    orient = 9  # HOG orientations
+    pix_per_cell_options = [8,10,12,14,16] # HOG pixels per cell
+    cell_per_block = 2 # HOG cells per block
+    hog_channel = 'ALL' # Can be 0, 1, 2, or "ALL"
+    spatial_size = (32, 32) # Spatial binning dimensions
+    hist_bins = 32    # Number of histogram bins
+    spatial_feat = True # Spatial features on or off
+    hist_feat = True # Histogram features on or off
+    hog_feat = True # HOG features on or off
+
+    classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options)
+    classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),('YCrCb', 16, 1),('YCrCb', 16, 2),('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
+
+    #classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),]
+
+    for classifier_args in classifier_arg_groups:
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+            global multip
+            try:
+                del multip
+            except:
+                pass
+            global classifier
+            global X_scaler
+            try:
+                del classifier
+            except:
+                pass
+            try:
+                del X_scaler
+            except:
+                pass
+            multip = p
+            
+            
+            
+            color_space, pix_per_cell, heat_threshold = classifier_args
+            identifier = ",".join(map(str,classifier_args))
+            
+            if (spatial_feat or hist_feat or hog_feat) is False:
                 continue
-            print("Processing %s..." % file_name)
-            reset_measurements()
-            VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
-                identifier + "," + str(heat_threshold) + ",slide2_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+            #if (os.path.isfile(os.path.join('output_images', identifier + "_test1.jpg")) == True):
+            #    continue
+            
+            print("Training vehicle classifier %s..." % identifier)
+            
+            
+            train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat)
+            
+            # ENTRY POINT
+            
+            # run image processing on test images
+            #heat_threshold_opts = {10:2,12:1,14:3}
+            #heat_threshold = heat_threshold_opts.get(pix_per_cell)
+            #for heat_threshold in [1,2,3,4,5,6,8,10]:
+            for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
+                print("Processing %s..." % test_image)
+                reset_measurements()
+                cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.basename(test_image)), cv2.cvtColor(
+                    process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
+            
+            #run image processing on test videos
+            for file_name in glob.glob("test_video.mp4"):
+                if "_processed" in file_name:
+                    continue
+                print("Processing %s..." % file_name)
+                reset_measurements()
+                VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
+                    identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+
+run()
