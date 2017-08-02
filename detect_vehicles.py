@@ -576,12 +576,15 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
     #                        cell_per_block=cell_per_block, 
     #                        hog_channel=hog_channel, spatial_feat=spatial_feat, 
     #                        hist_feat=hist_feat, hog_feat=hog_feat) 
-    flagged_windows = find_cars(image, 2.0, classifier, X_scaler, color_space=color_space, 
+    flagged_windows_all = map(lambda x: find_cars(image, x, classifier, X_scaler, color_space=color_space, 
                             spatial_size=spatial_size, hist_bins=hist_bins, 
                             orient=orient, pix_per_cell=pix_per_cell, 
                             cell_per_block=cell_per_block, 
                             hog_channel=hog_channel, spatial_feat=spatial_feat, 
-                            hist_feat=hist_feat, hog_feat=hog_feat)
+                            hist_feat=hist_feat, hog_feat=hog_feat), [1.0,1.5,2.0,2.5])
+    flagged_windows = []
+    for x in flagged_windows_all:
+        flagged_windows.extend(x)
 
     image_with_flagged_windows = draw_boxes(image, flagged_windows, color=(0, 0, 255), thick=6)
     
@@ -636,9 +639,10 @@ def run():
     spatial_feat = True # Spatial features on or off
     hist_feat = True # Histogram features on or off
     hog_feat = True # HOG features on or off
+    heat_thresholds = [1,3,5]
 
-    classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options)
-    classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),('YCrCb', 16, 1),('YCrCb', 16, 2),('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
+    classifier_arg_groups = itertools.product(color_space_options, pix_per_cell_options, heat_thresholds)
+    #classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),('YCrCb', 16, 1),('YCrCb', 16, 2),('LUV', 8, 1),('LUV', 10, 1),('LUV', 12, 1),('LUV', 12, 2),]
 
     #classifier_arg_groups = [('YCrCb', 8, 1),('YCrCb', 10, 1),('YCrCb', 12, 1),('YCrCb', 12, 2),]
 
@@ -682,11 +686,11 @@ def run():
             #heat_threshold_opts = {10:2,12:1,14:3}
             #heat_threshold = heat_threshold_opts.get(pix_per_cell)
             #for heat_threshold in [1,2,3,4,5,6,8,10]:
-            for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
-                print("Processing %s..." % test_image)
-                reset_measurements()
-                cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.basename(test_image)), cv2.cvtColor(
-                    process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
+            #for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
+            #    print("Processing %s..." % test_image)
+            #    reset_measurements()
+            #    cv2.imwrite(os.path.join('output_images', identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.basename(test_image)), cv2.cvtColor(
+            #        process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
             
             #run image processing on test videos
             for file_name in glob.glob("test_video.mp4"):
