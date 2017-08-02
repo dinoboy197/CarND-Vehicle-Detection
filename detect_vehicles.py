@@ -555,18 +555,16 @@ def train_vehicle_classifier(identifier, color_space, hog_channel, hist_bins, sp
 
 def reset_measurements():
     """reset vehicle state between videos / still images"""
-    global heat
-    try:
-        del heat
-    except:
-        pass
+    global last_heat_measurements
+    
+    last_heat_measurements = deque()
 
 
 def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold):
     """completely process a single BGR image"""
     global classifier
     global X_scaler
-    global heat
+    global last_heat_measurements
 
     #windows = slide_window_2(image)
 
@@ -593,20 +591,23 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
         plt.imshow(image_with_flagged_windows)
         plt.show()
     
-    try:
-        heat
-    except:
-        print("resetting heatmap")
-        heat = np.zeros_like(image[:,:,0]).astype(np.float)
+    heat = np.zeros_like(image[:,:,0]).astype(np.float)
 
     # Add heat to each box in box list
     heat = add_heat(heat, flagged_windows)
+    
+    if len(last_heat_measurements) >= 5:
+        last_heat_measurements.popleft()
+    
+    last_heat_measurements.append(heat)
+    
+    total_heat = np.sum(last_heat_measurements, axis = 0)
         
     # Apply threshold to help remove false positives
-    heat = apply_threshold(heat, heat_threshold)
+    total_heat = apply_threshold(total_heat, heat_threshold)
     
     # Visualize the heatmap when displaying    
-    heatmap = np.clip(heat, 0, 255)
+    heatmap = np.clip(total_heat, 0, 255)
     
     if debug_image == True:
         plt.figure(figsize=(20, 10))
@@ -684,7 +685,7 @@ def run():
             # run image processing on test images
             #heat_threshold_opts = {10:2,12:1,14:3}
             #heat_threshold = heat_threshold_opts.get(pix_per_cell)
-            for heat_threshold in [2,3,4,5]:
+            for heat_threshold in [7,8,9,10,11]:
             #for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
             #    print("Processing %s..." % test_image)
             #    reset_measurements()
@@ -698,6 +699,6 @@ def run():
                     print("Processing %s..." % file_name)
                     reset_measurements()
                     VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
-                        identifier + "," + str(heat_threshold) + ",slide2_fast_car_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+                        identifier + "," + str(heat_threshold) + ",slide2_fast_car_queue_heat_smoothing_" + os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
 
 run()
