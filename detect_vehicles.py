@@ -321,8 +321,8 @@ def draw_labeled_bboxes(img, labels):
         nonzeroy = np.array(nonzero[0])
         nonzerox = np.array(nonzero[1])
         # Define a bounding box based on min/max x and y
-        bbox = ((np.min(nonzerox), np.min(nonzeroy)),
-                (np.max(nonzerox), np.max(nonzeroy)))
+        bbox = ((np.min(nonzerox)-10, np.min(nonzeroy)),
+                (np.max(nonzerox)-10, np.max(nonzeroy)))
         # Draw the box on the image
         cv2.rectangle(imcopy, bbox[0], bbox[1], (0, 255, 0), 6)
     # Return the image
@@ -467,9 +467,6 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
         plt.figure(figsize=(20, 10))
         plt.imshow(final)
         plt.show()
-        
-    if len(last_heat_measurements) >= 5:
-        debug_image = True
 
     return final
 
@@ -532,7 +529,7 @@ def run():
 
             # run image processing on test images
             # was [5,6,7,8,9,10,11,12] during experimentation
-            for heat_threshold in [9]:
+            for heat_threshold in [11]:
                 for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
                     print("Processing %s..." % test_image)
                     reset_measurements()
@@ -540,7 +537,7 @@ def run():
                         process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold, detection_scales), cv2.COLOR_BGR2RGB))
 
                 # run image processing on test videos
-                for file_name in glob.glob("project_video.mp4"):
+                for file_name in glob.glob("*_video.mp4"):
                     if "_processed" in file_name:
                         continue
                     print("Processing %s..." % file_name)
