@@ -236,12 +236,36 @@ def find_cars_wrapper(img, scale, classifier, X_scaler, color_space='RGB', spati
     nysteps = (nyblocks - nblocks_per_window) // cells_per_step
 
     # Compute individual channel HOG features for the entire image
-    hog1 = get_hog_features(
-        ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
-    hog2 = get_hog_features(
-        ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
-    hog3 = get_hog_features(
-        ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    
+    if debug_image == False:
+        hog1 = get_hog_features(
+            ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
+        hog2 = get_hog_features(
+            ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
+        hog3 = get_hog_features(
+            ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    if debug_image == True:
+        hog1, vis1 = get_hog_features(
+            ch1, orient, pix_per_cell, cell_per_block, vis=True, feature_vec=False)
+        hog2, vis2 = get_hog_features(
+            ch2, orient, pix_per_cell, cell_per_block, vis=True, feature_vec=False)
+        hog3, vis3 = get_hog_features(
+            ch3, orient, pix_per_cell, cell_per_block, vis=True, feature_vec=False)
+    
+        f, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2, sharex=True, sharey=True, figsize=(20, 10))
+        ax1.imshow(ch1, cmap='gray')
+        ax1.set_title('Channel 1')
+        ax2.imshow(vis1, cmap='gray')
+        ax2.set_title('Channel 1 HOG')
+        ax3.imshow(ch2, cmap='gray')
+        ax3.set_title('Channel 2')
+        ax4.imshow(vis2, cmap='gray')
+        ax4.set_title('Channel 2 HOG')
+        ax5.imshow(ch3, cmap='gray')
+        ax5.set_title('Channel 3')
+        ax6.imshow(vis3, cmap='gray')
+        ax6.set_title('Channel 3 HOG')
+        plt.show()
 
     all_windows = []
     matched_windows = []
@@ -373,11 +397,12 @@ def reset_measurements():
     last_heat_measurements = deque()
 
 
-def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold):
+def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold, detection_scales):
     """completely process a single BGR image"""
     global classifier
     global X_scaler
     global last_heat_measurements
+    global debug_image
 
     # find all windows with vehicles identified
     flagged_windows_all = map(lambda x: find_cars_wrapper(image, x, classifier, X_scaler, color_space=color_space,
@@ -385,7 +410,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
                                                           orient=orient, pix_per_cell=pix_per_cell,
                                                           cell_per_block=cell_per_block,
                                                           hog_channel=hog_channel, spatial_feat=spatial_feat,
-                                                          hist_feat=hist_feat, hog_feat=hog_feat), [1.0])
+                                                          hist_feat=hist_feat, hog_feat=hog_feat), detection_scales)
     flagged_windows = []
     for x in flagged_windows_all:
         flagged_windows.extend(x)
@@ -393,7 +418,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
     if debug_image == True:
         # draw flagged windows on image
         image_with_flagged_windows = draw_boxes(
-            image, flagged_windows, color=(0, 0, 255), thick=6)
+            cv2.cvtColor(image,cv2.COLOR_BGR2RGB), flagged_windows, color=(0, 0, 255), thick=6)
         plt.figure(figsize=(20, 10))
         plt.imshow(image_with_flagged_windows)
         plt.show()
@@ -405,7 +430,7 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
     heat = add_heat(heat, flagged_windows)
 
     # store last three bounding box measurements
-    if len(last_heat_measurements) >= 3:
+    if len(last_heat_measurements) >= 5:
         last_heat_measurements.popleft()
 
     last_heat_measurements.append(heat)
@@ -419,12 +444,21 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
 
     if debug_image == True:
         # draw heatmap
-        plt.figure(figsize=(20, 10))
-        plt.imshow(heatmap, cmap='hot')
+        f, (ax1, ax2) = plt.subplots(2, sharex=True, figsize=(20, 10))
+        ax1.imshow(cv2.cvtColor(draw_boxes(
+            image, flagged_windows, color=(0, 0, 255), thick=6), cv2.COLOR_BGR2RGB))
+        ax1.set_title('Image with vehicle detections')
+        ax2.imshow(heatmap, cmap='hot')
+        ax2.set_title('Heatmap')
         plt.show()
 
     # Find final boxes from heatmap using label function
     labels = label(heatmap)
+    
+    if debug_image == True:
+        plt.imshow(labels[0], cmap='gray')
+        plt.title('%s vehicles found' % labels[1])
+        plt.show()
 
     # draw final bounding boxes on image
     final = draw_labeled_bboxes(image, labels)
@@ -433,6 +467,9 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
         plt.figure(figsize=(20, 10))
         plt.imshow(final)
         plt.show()
+        
+    if len(last_heat_measurements) >= 5:
+        debug_image = True
 
     return final
 
@@ -456,6 +493,8 @@ def run():
     hist_feat_options = [False]
     # HOG features on or off; was [False; True] during experimentation
     hog_feat_options = [True]
+    # detection scales for sliding windows
+    detection_scales = [1.0] # included combinations and permutations of 1.0,1.5,2.0,2.5 during experimentation
 
     classifier_arg_groups = itertools.product(
         color_space_options, pix_per_cell_options, spatial_feat_options, hist_feat_options, hog_feat_options)
@@ -493,20 +532,20 @@ def run():
 
             # run image processing on test images
             # was [5,6,7,8,9,10,11,12] during experimentation
-            for heat_threshold in [8]:
+            for heat_threshold in [9]:
                 for test_image in glob.glob(os.path.join('test_images', '*.jpg')):
                     print("Processing %s..." % test_image)
                     reset_measurements()
                     cv2.imwrite(os.path.join('output_images', os.path.basename(test_image)), cv2.cvtColor(
-                        process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold), cv2.COLOR_BGR2RGB))
+                        process_image(cv2.cvtColor(cv2.imread(test_image), cv2.COLOR_RGB2BGR), color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold, detection_scales), cv2.COLOR_BGR2RGB))
 
                 # run image processing on test videos
-                for file_name in glob.glob("*_video.mp4"):
+                for file_name in glob.glob("project_video.mp4"):
                     if "_processed" in file_name:
                         continue
                     print("Processing %s..." % file_name)
                     reset_measurements()
-                    VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold)).write_videofile(
-                        os.path.splitext(file_name)[0] + "_processed.mp4", audio=False)
+                    VideoFileClip(file_name).fl_image(lambda x: process_image(x, color_space, hog_channel, hist_bins, spatial_size, orient, pix_per_cell, cell_per_block, spatial_feat, hist_feat, hog_feat, heat_threshold, detection_scales)).write_videofile(
+                        os.path.splitext(file_name)[0] + "_processed_test.mp4", audio=False)
 
 run()
