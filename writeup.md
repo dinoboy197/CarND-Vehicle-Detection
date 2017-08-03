@@ -11,9 +11,9 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 [image1]: ./examples/car_not_car.png
-[image2]: ./examples/HOG_example.jpg
-[image3]: ./examples/sliding_windows.jpg
-[image4]: ./examples/sliding_window.jpg
+[image2]: ./examples/HOG_example.png
+[image3]: ./examples/sliding_windows.png
+[image4]: ./examples/sliding_window.png
 [image5]: ./examples/bboxes_and_heat.png
 [image6]: ./examples/labels_map.png
 [image7]: ./examples/output_bboxes.png
@@ -34,7 +34,7 @@ Here is an example of a vehicle and not vehicle:
 HOG features are extracted from each image using a method called [`extract_features`](1234). This method converts the color space of the image into the [YCrCb color space](https://en.wikipedia.org/wiki/YCbCr) (Luma, Blue-difference chroma and Red-difference chroma). Next, the color channels are separated and each channel is passed through a HOG gradient compute method, called [`get_hog_features`](1234). This method computes
 I started by reading in all the `vehicle` and `non-vehicle` images.
 
-Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
+Here is an example using the `YCrCb` color space and HOG parameters of `orientations=9`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
 
 ![alt text][image2]
 
@@ -72,6 +72,7 @@ After implementing a basic classifier with reasonable performance on the trainin
 
 As a speed optimization, the sliding window search computes HOG features for the entire image first, then the sliding windows pull in the HOG features captured by that window, and other features are would be computed for that window in its entirety. Together with Python's multiprocessing library, the speed improvements enabled experimentation across the various parameters in a reasonable time.
 
+
 ![alt text][image3]
 
 To attempt to improve vehicle detection accuracy in the project video, I experimented with changing the window size and including window sizes of multiples of 32: 64, 96, 128, 160, and 192. Performance decreased when using any of the other sizes. Additionally, I tried to use multiple sizes at once; this caused problems further down in the vehicle detection pipeline (the bounding box smoother).
@@ -96,15 +97,15 @@ I recorded the positions of positive detections in each frame of the video. Posi
 
 Here is an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
 
-### Here are six frames and their corresponding heatmaps:
+### Here is a frame and its corresponding heatmap:
 
 ![alt text][image5]
 
-### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
+### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap:
 ![alt text][image6]
 
 
-### Here the resulting bounding boxes are drawn onto the last frame in the series:
+### Here the resulting bounding boxes are drawn the image:
 ![alt text][image7]
 
 
@@ -124,6 +125,13 @@ This project proved interesting as it required good judgement to determine where
 * heatmap stack size and thresholding variable
 
 Rather than completing an exhaustive grid search on all possibilities (which would not only have been computationally infeasible in Python but also likely to overfit the training data), I made incremental educated guesses about which choices to make and which parameters to tune. Overall, I was satisfied with the output but would like to make improvements.
+
+Problems in the current implementation that could be improved upon include:
+* reduction in number of false positive detections, in the form of:
+  * small detections sprinkled around the video - could add more post-processing to filter out small boxes after final heat map label creation
+  * a few large detections in shadow areas - continue the project with other spatial features?
+* not detecting the entirety of the vehicle
+  * often the side of the vehicles are missed - include more training data with side images of vehicles
 
 The pipeline would likely fail to detect in various situations, including (but not limited to):
 * vehicles other than cars - fix with more training data with other vehicles
