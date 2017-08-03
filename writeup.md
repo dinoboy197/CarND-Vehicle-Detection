@@ -25,21 +25,22 @@ The goals / steps of this project are the following:
 
 #### 1. Explain how (and identify where in your code) you extracted HOG features from the training images.
 
-The code for this step is contained in the first code cell of the IPython notebook (or in lines # through # of the file called `some_file.py`).
-I started by reading in all the `vehicle` and `non-vehicle` images.  Here is an example of one of each of the `vehicle` and `non-vehicle` classes:
+As training data, I chose to use the KITTI vehicle images dataset and the and Extra non-vehicle images dataset provided, which includes positive and negative examples of vehicles.
+
+Here is an example of a vehicle and not vehicle:
 
 ![alt text][image1]
 
-I then explored different color spaces and different `skimage.hog()` parameters (`orientations`, `pixels_per_cell`, and `cells_per_block`).  I grabbed random images from each of the two classes and displayed them to get a feel for what the `skimage.hog()` output looks like.
+HOG features are extracted from each image using a method called [`extract_features`](1234). This method converts the color space of the image into the [YCrCb color space](https://en.wikipedia.org/wiki/YCbCr) (Luma, Blue-difference chroma and Red-difference chroma). Next, the color channels are separated and each channel is passed through a HOG gradient compute method, called [`get_hog_features`](1234). This method computes
+I started by reading in all the `vehicle` and `non-vehicle` images.
 
 Here is an example using the `YCrCb` color space and HOG parameters of `orientations=8`, `pixels_per_cell=(8, 8)` and `cells_per_block=(2, 2)`:
-
 
 ![alt text][image2]
 
 #### 2. Explain how you settled on your final choice of HOG parameters.
 
-My general optimization strategy for this project was to increase the accuracy of the classifier by tuning one feature extraction parameter at a time among the feature, color space, and various hyperparameters for the feature set type selected. While not a complete grid search of all available parameters for tuning in the feature space, my results show reasonably good performance.
+My general optimization strategy for this project was to increase the accuracy of the classifier by tuning one feature extraction parameter at a time among: the feature type (HOG, spatial bins, color histogram bins), color space, and various hyperparameters for the feature type selected. While not a complete grid search of all available parameters for tuning in the feature space, my results show reasonably good performance.
 
 My first investigation was into the effect of HOG, color histogram, and spatial binned features. Using reasonable defaults provided by the sample code provided, HOG features alone led to the most robust classifier in terms of accuracy without much tuning; addition of either color histogram or spatial features greatly increased the number of false positive vehicle detections. For this project, I chose to focus on HOG features alone and optimize them. This doesn't discount the possible usefulness of histogram or spatial features, I've simply chosen to focus my research in this project on HOG features.
 
@@ -51,15 +52,11 @@ Next, I optimized various hyperparameters of the HOG transformation: number of H
 * Number of HOG orientations: 9
 * Pixels per cell: 8
 
-Some images which show classification
-
 #### 3. Describe how (and identify where in your code) you trained a classifier using your selected HOG features (and color features if you used them).
 
 I trained a linear SVM classifier for detecting vehicles in images by extracting features from a training set, scaling the feature vectors, and finally using the `fit` method of the `LinearSVC` classifier.
 
-As training data, I chose to use the KITTI vehicle images dataset and the and Extra non-vehicle images dataset provided, which includes positive and negative examples of vehicles. To increase the generality of my classifier, I flipped each image on the horizontal axis, which increased the total size of the training data to 11932 vehicle images and 10136 non-vehicle images. The relative equality of the counts of vehicle and non-vehicle images reduces the bias of any classifier towards making vehicle or non-vehicle predictions.
-
-Each vehicle and non-vehicle image had HOG features (as described above) extracted. Each one dimensional feature vector was scaled using a the [Scikit Learn `RobustScaler`](http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html), which "scales features using statistics that are robust to outliers" by using the median and interquartile range, rather than the sample mean as the [`StandardScaler`](http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html) does.
+Each vehicle and non-vehicle image had HOG features (as described above) extracted. To increase the generality of my classifier, I flipped each image on the horizontal axis, which increased the total size of the training data to 11932 vehicle images and 10136 non-vehicle images. The relative equality of the counts of vehicle and non-vehicle images reduces the bias of any classifier towards making vehicle or non-vehicle predictions. Each one dimensional feature vector was scaled using a the [Scikit Learn `RobustScaler`](http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html), which "scales features using statistics that are robust to outliers" by using the median and interquartile range, rather than the sample mean as the [`StandardScaler`](http://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html) does.
 
 After scaling, the feature vectors were split into a training and validation set, with 20% of the data used for testing.
 
@@ -71,18 +68,20 @@ Upon completion of the training pipeline, I continued to experiment with other c
 
 #### 1. Describe how (and identify where in your code) you implemented a sliding window search.  How did you decide what scales to search and how much to overlap windows?
 
-After implementing a basic classifier with reasonable performance on the training data provided, I moved on to detecting vehicles in test images and video. I used a "sliding window" approach in which a window which encapsulates a sub-image of the full image is moved across the image, then features are extracted from the sub-image, then the classifier determines if there is a vehicle or not in each sub-image. The window slides both horizontally and vertically across the image. I chose a window size of 64x64 pixels, with an overlap of 75% as the window slides around the image. Once all windows have been searched, the list of windows in which vehicles were detected was returned.
+After implementing a basic classifier with reasonable performance on the training data provided, I moved on to detecting vehicles in test images and video. I used a "sliding window" approach in which a window which encapsulates a sub-image of the full image is moved across the image, then features are extracted from the sub-image, then the classifier determines if there is a vehicle or not in each sub-image. The window slides both horizontally and vertically across the image. I chose a window size of 64x64 pixels, with an overlap of 75% as the window slides around the image. Once all windows have been searched, the list of windows in which vehicles were detected was returned. As an early optimization to eliminate extra false positive vehicle detections, I chose to limit the vertical span of searching from the just above the top of the horizon to just above the visual dashboard in the image.
 
 As a speed optimization, the sliding window search computes HOG features for the entire image first, then the sliding windows pull in the HOG features captured by that window, and other features are would be computed for that window in its entirety. Together with Python's multiprocessing library, the speed improvements enabled experimentation across the various parameters in a reasonable time.
 
 ![alt text][image3]
 
+To attempt to improve vehicle detection accuracy in the project video, I experimented with changing the window size and including window sizes of multiples of 32: 64, 96, 128, 160, and 192. Performance decreased when using any of the other sizes. Additionally, I tried to use multiple sizes at once; this caused problems further down in the vehicle detection pipeline (the bounding box smoother).
+
 #### 2. Show some examples of test images to demonstrate how your pipeline is working.  What did you do to optimize the performance of your classifier?
 
 My classifier accuracy and video processing performance optimization is discussed above. Here are some sample images showing the boxes around images in example which were classified as vehicles:
 
-
 ![alt text][image4]
+
 ---
 
 ### Video Implementation
@@ -93,9 +92,9 @@ My pipeline successfully generates [a video stream which shows bounding boxes ar
 
 #### 2. Describe how (and identify where in your code) you implemented some kind of filter for false positives and some method for combining overlapping bounding boxes.
 
-I recorded the positions of positive detections in each frame of the video.  From the positive detections I created a heatmap and then thresholded that map to identify vehicle positions.  I then used `scipy.ndimage.measurements.label()` to identify individual blobs in the heatmap.  I then assumed each blob corresponded to a vehicle.  I constructed bounding boxes to cover the area of each blob detected.  
+I recorded the positions of positive detections in each frame of the video. Positive detection regions were tracked for the previous four frames at each frame processing. The five total positive detections were stacked together (each pixel inside a region is one count), and then the final stacked heatmap was thresholded identify vehicle positions (eight counts or more pixel being used as the threshld). I then used [SciPy's `label`](https://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.ndimage.measurements.label.html) to identify individual blobs in the heatmap. Each blob is assumed to correspond to a vehicle, and each blob was used to construct a vehicle bounding box which was drawn over the image frame.
 
-Here's an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
+Here is an example result showing the heatmap from a series of frames of video, the result of `scipy.ndimage.measurements.label()` and the bounding boxes then overlaid on the last frame of video:
 
 ### Here are six frames and their corresponding heatmaps:
 
@@ -103,6 +102,7 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 ### Here is the output of `scipy.ndimage.measurements.label()` on the integrated heatmap from all six frames:
 ![alt text][image6]
+
 
 ### Here the resulting bounding boxes are drawn onto the last frame in the series:
 ![alt text][image7]
@@ -114,5 +114,20 @@ Here's an example result showing the heatmap from a series of frames of video, t
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+This project proved interesting as it required good judgement to determine where the easiest sections were to optimize vehicle detection at any given time. The most challenging part of the project was the search over the large number of parameters in the training and classification pipeline. Many different pieces could be adjusted, including:
+* size and composition of the training image set
+* choice of combination of features extracted (HOG, spatial, and color histogram)
+* parameters for each type of feature extraction
+* choice of machine learning model (SVC, random forest, etc)
+* hyperparameters of machine learning model
+* sliding window size and stride
+* heatmap stack size and thresholding variable
+
+Rather than completing an exhaustive grid search on all possibilities (which would not only have been computationally infeasible in Python but also likely to overfit the training data), I made incremental educated guesses about which choices to make and which parameters to tune. Overall, I was satisfied with the output but would like to make improvements.
+
+The pipeline would likely fail to detect in various situations, including (but not limited to):
+* vehicles other than cars - fix with more training data with other vehicles
+* nighttime detection - fix with different training data and possibly different feature extraction types / parameters
+* detection of vehicles driving perpandicular to vehicle - adjust heatmap queuing value and thresholding, possibly training data, too
+
 
