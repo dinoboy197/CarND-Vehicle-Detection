@@ -65,135 +65,6 @@ def color_hist(img, nbins=32):
     return hist_features
 
 
-def slide_window_1(img):
-    '''method to compute sliding windows over image for vehicle detection'''
-
-    top = np.int(img.shape[0] / 2)
-    x_start_stop = [None, None]
-    y_start_stop = [top, None]
-    xy_window_min = (50, 50)
-    xy_window_max = (250, 250)
-    xy_overlap = (0.75, 0.75)
-
-    # If x and/or y start/stop positions not defined, set to image size
-    if x_start_stop[0] == None:
-        x_start_stop[0] = 0
-    if x_start_stop[1] == None:
-        x_start_stop[1] = img.shape[1]
-    if y_start_stop[0] == None:
-        y_start_stop[0] = 0
-    if y_start_stop[1] == None:
-        y_start_stop[1] = img.shape[0]
-
-    # Initialize a list to append window positions to
-    window_list_all = []
-
-    for i in range(5):
-        window_list = []
-        xy_window = (xy_window_min[0] + np.int(i * (xy_window_max[0] - xy_window_min[
-                     0]) / 5), xy_window_min[1] + np.int(i * (xy_window_max[1] - xy_window_min[1]) / 5))
-
-        # Compute the span of the region to be searched
-        xspan = x_start_stop[1] - x_start_stop[0]
-        yspan = y_start_stop[1] - y_start_stop[0]
-        # Compute the number of pixels per step in x/y
-        nx_pix_per_step = np.int(xy_window[0] * (1 - xy_overlap[0]))
-        ny_pix_per_step = np.int(xy_window[1] * (1 - xy_overlap[1]))
-        # Compute the number of windows in x/y
-        nx_buffer = np.int(xy_window[0] * (xy_overlap[0]))
-        ny_buffer = np.int(xy_window[1] * (xy_overlap[1]))
-        nx_windows = np.int((xspan - nx_buffer) / nx_pix_per_step)
-        ny_windows = np.int((yspan - ny_buffer) / ny_pix_per_step)
-        # Loop through finding x and y window positions
-        # Note: you could vectorize this step, but in practice
-        # you'll be considering windows one by one with your
-        # classifier, so looping makes sense
-        for ys in range(ny_windows):
-            for xs in range(nx_windows):
-                # Calculate window position
-                startx = xs * nx_pix_per_step + x_start_stop[0]
-                endx = startx + xy_window[0]
-                starty = ys * ny_pix_per_step + y_start_stop[0]
-                endy = starty + xy_window[1]
-
-                # Append window position to list
-                window_list.append(((startx, starty), (endx, endy)))
-
-        if debug_image == True:
-            plt.imshow(draw_boxes(img, window_list))
-            plt.show()
-
-        window_list_all.extend(window_list)
-    # Return the list of windows
-    return window_list_all
-
-
-def slide_window_2(img):
-    '''method to compute sliding windows over image for vehicle detection'''
-
-    top = 400
-    x_start_stop = [None, None]
-    y_start_stop = [top, None]
-    xy_window_min = (50, 50)
-    xy_window_max = (250, 250)
-    xy_overlap = (0.75, 0.75)
-
-    # If x and/or y start/stop positions not defined, set to image size
-    if x_start_stop[0] == None:
-        x_start_stop[0] = 0
-    if x_start_stop[1] == None:
-        x_start_stop[1] = img.shape[1]
-    if y_start_stop[0] == None:
-        y_start_stop[0] = 0
-    if y_start_stop[1] == None:
-        y_start_stop[1] = img.shape[0]
-
-    # Initialize a list to append window positions to
-    window_list_all = []
-
-    for i in range(5):
-        window_list = []
-        xy_window = (xy_window_min[0] + np.int(i * (xy_window_max[0] - xy_window_min[
-                     0]) / 5), xy_window_min[1] + np.int(i * (xy_window_max[1] - xy_window_min[1]) / 5))
-
-        # Compute the span of the region to be searched
-        xspan = x_start_stop[1] - x_start_stop[0]
-        yspan = y_start_stop[1] - y_start_stop[0]
-        # Compute the number of pixels per step in x/y
-        nx_pix_per_step = np.int(xy_window[0] * (1 - xy_overlap[0]))
-        ny_pix_per_step = np.int(xy_window[1] * (1 - xy_overlap[1]))
-        # Compute the number of windows in x/y
-        nx_buffer = np.int(xy_window[0] * (xy_overlap[0]))
-        ny_buffer = np.int(xy_window[1] * (xy_overlap[1]))
-        nx_windows = np.int((xspan - nx_buffer) / nx_pix_per_step)
-        ny_windows = 3
-        # Loop through finding x and y window positions
-        # Note: you could vectorize this step, but in practice
-        # you'll be considering windows one by one with your
-        # classifier, so looping makes sense
-        for ys in range(ny_windows):
-            for xs in range(nx_windows):
-                # Calculate window position
-                startx = xs * nx_pix_per_step + x_start_stop[0]
-                endx = startx + xy_window[0]
-                starty = ys * ny_pix_per_step + y_start_stop[0]
-                endy = starty + xy_window[1]
-
-                # Append window position to list
-                window_list.append(((startx, starty), (endx, endy)))
-
-        if debug_image == True:
-            plt.imshow(draw_boxes(img, window_list))
-            plt.show()
-
-        window_list_all.extend(window_list)
-    # Return the list of windows
-    return window_list_all
-
-
-# Define a function to extract features from a single image window
-# This function is very similar to extract_features()
-# just for a single image rather than list of images
 def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
                         hist_bins=32, orient=9,
                         pix_per_cell=8, cell_per_block=2, hog_channel=0,
@@ -243,7 +114,30 @@ def single_img_features(img, color_space='RGB', spatial_size=(32, 32),
     return np.concatenate(img_features)
 
 
-def find_cars_inner(args):
+def single_image_features_tupled(args):
+    ''' computes single image features during training'''
+    img_name, flip, color_space, spatial_size, hist_bins, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat = args
+    image = cv2.imread(img_name)
+    if flip is True:
+        image = cv2.flip(image, 1)
+    return single_img_features(image, color_space, spatial_size, hist_bins, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat)
+
+
+def extract_features(file_names, color_space='RGB', spatial_size=(32, 32),
+                     hist_bins=32, orient=9,
+                     pix_per_cell=8, cell_per_block=2, hog_channel=0,
+                     spatial_feat=True, hist_feat=True, hog_feat=True):
+    '''extract features from list of image names in parallel'''
+    global multip
+    regular = multip.map(single_image_features_tupled, [(file_name, False, color_space, spatial_size, hist_bins,
+                                                         orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for file_name in file_names])
+    flipped = multip.map(single_image_features_tupled, [(file_name, True, color_space, spatial_size, hist_bins,
+                                                         orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for file_name in file_names])
+    return np.concatenate((regular, flipped))
+
+
+def find_cars(args):
+    '''method to find all vehicle bounding boxes given a single region to search'''
     xb, yb, cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window, scale, ystart, pix_per_cell, X_scaler, classifier, hog_channel, spatial_feat, spatial_size, hist_feat, hist_bins = args
     ypos = yb * cells_per_step
     xpos = xb * cells_per_step
@@ -294,13 +188,10 @@ def find_cars_inner(args):
 
     return (this_window, found_car)
 
-# Define a single function that can extract features using hog
-# sub-sampling and make predictions
 
-
-def find_cars(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=(32, 32), hist_bins=32, orient=9, pix_per_cell=8,
-              cell_per_block=2, hog_channel=0, spatial_feat=True, hist_feat=True, hog_feat=True):
-
+def find_cars_wrapper(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=(32, 32), hist_bins=32, orient=9, pix_per_cell=8,
+                      cell_per_block=2, hog_channel=0, spatial_feat=True, hist_feat=True, hog_feat=True):
+    '''method to find vehicle detections in parallel'''
     global multip
 
     ystart = 400
@@ -356,8 +247,8 @@ def find_cars(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=
     matched_windows = []
 
     iter = itertools.product(range(nxsteps), range(nysteps))
-    results = list(multip.map(find_cars_inner, [(x[0], x[1], cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window,
-                                                 scale, ystart, pix_per_cell, X_scaler, classifier, hog_channel, spatial_feat, spatial_size, hist_feat, hist_bins) for x in iter]))
+    results = list(multip.map(find_cars, [(x[0], x[1], cells_per_step, hog1, hog2, hog3, nblocks_per_window, ctrans_tosearch, window,
+                                           scale, ystart, pix_per_cell, X_scaler, classifier, hog_channel, spatial_feat, spatial_size, hist_feat, hist_bins) for x in iter]))
     all_windows = list(map(lambda x: x[0], results))
     matched_windows = list(filter(
         lambda x: x != None, map(lambda x: x[0] if x[1] == True else None, results)))
@@ -367,58 +258,6 @@ def find_cars(img, scale, classifier, X_scaler, color_space='RGB', spatial_size=
         plt.show()
 
     return matched_windows
-
-
-def single_image_features_tupled(args):
-    img_name, flip, cropping, color_space, spatial_size, hist_bins, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat = args
-    image = cv2.imread(img_name)
-    if flip is True:
-        image = cv2.flip(image, 1)
-    if cropping is not None:
-        xmin = min(cropping[0], cropping[1])
-        xmax = max(cropping[0], cropping[1])
-        ymin = min(cropping[2], cropping[3])
-        ymax = max(cropping[2], cropping[3])
-
-        if (xmin < xmax) and (ymin < ymax) and (ymin >= np.int(image.shape[0] / 2)):
-            image = cv2.resize(image[ymin:ymax, xmin:xmax], (64, 64))
-        else:
-            return None
-    return single_img_features(image, color_space, spatial_size, hist_bins, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat)
-
-
-def extract_features(file_names, color_space='RGB', spatial_size=(32, 32),
-                     hist_bins=32, orient=9,
-                     pix_per_cell=8, cell_per_block=2, hog_channel=0,
-                     spatial_feat=True, hist_feat=True, hog_feat=True):
-    '''extract features from list of image names'''
-    global multip
-    regular = multip.map(single_image_features_tupled, [(file_name, False, None, color_space, spatial_size, hist_bins,
-                                                         orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for file_name in file_names])
-    flipped = multip.map(single_image_features_tupled, [(file_name, True, None, color_space, spatial_size, hist_bins,
-                                                         orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat) for file_name in file_names])
-    return np.concatenate((regular, flipped))
-
-
-def search_windows_with_args(args):
-    img, window, clf, scaler, color_space, spatial_size, hist_bins, hist_range, orient, pix_per_cell, cell_per_block, hog_channel, spatial_feat, hist_feat, hog_feat = args
-
-    # 3) Extract the test window from original image
-    test_img = cv2.resize(
-        img[window[0][1]:window[1][1], window[0][0]:window[1][0]], (64, 64))
-    # 4) Extract features for that window using single_img_features()
-    features = single_img_features(test_img, color_space=color_space,
-                                   spatial_size=spatial_size, hist_bins=hist_bins,
-                                   orient=orient, pix_per_cell=pix_per_cell,
-                                   cell_per_block=cell_per_block,
-                                   hog_channel=hog_channel, spatial_feat=spatial_feat,
-                                   hist_feat=hist_feat, hog_feat=hog_feat)
-    # 5) Scale extracted features to be fed to classifier
-    test_features = scaler.transform(np.array(features).reshape(1, -1))
-    # 6) Predict using your classifier
-    prediction = clf.predict(test_features)
-    # 7) If positive (prediction == 1) then save the window
-    return window if prediction == 1 else None
 
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
@@ -541,12 +380,12 @@ def process_image(image, color_space, hog_channel, hist_bins, spatial_size, orie
     global last_heat_measurements
 
     # find all windows with vehicles identified
-    flagged_windows_all = map(lambda x: find_cars(image, x, classifier, X_scaler, color_space=color_space,
-                                                  spatial_size=spatial_size, hist_bins=hist_bins,
-                                                  orient=orient, pix_per_cell=pix_per_cell,
-                                                  cell_per_block=cell_per_block,
-                                                  hog_channel=hog_channel, spatial_feat=spatial_feat,
-                                                  hist_feat=hist_feat, hog_feat=hog_feat), [1.0])
+    flagged_windows_all = map(lambda x: find_cars_wrapper(image, x, classifier, X_scaler, color_space=color_space,
+                                                          spatial_size=spatial_size, hist_bins=hist_bins,
+                                                          orient=orient, pix_per_cell=pix_per_cell,
+                                                          cell_per_block=cell_per_block,
+                                                          hog_channel=hog_channel, spatial_feat=spatial_feat,
+                                                          hist_feat=hist_feat, hog_feat=hog_feat), [1.0])
     flagged_windows = []
     for x in flagged_windows_all:
         flagged_windows.extend(x)
