@@ -73,7 +73,7 @@ By breaking up an image into blocks of pixels, binning the gradient orientations
 
 ![alt text][horseorig]
 
-** HOG features**
+**HOG features**
 
 ![alt text][horsehog]
 
